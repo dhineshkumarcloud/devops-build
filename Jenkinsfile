@@ -1,0 +1,56 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_USER = "dhinesh5799"                     // your Docker Hub username
+        DOCKER_PASS = Dhineshkumar@1('dockerhub-creds')   // Jenkins credentials ID
+        DEV_REPO = "dhinesh5799/react-app-dev"
+        PROD_REPO = "dhinesh5799/react-app-prod"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                dir('build') {                          // 👈 work inside build folder
+                    sh 'docker build -t build-image .'
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+
+                    if (env.BRANCH_NAME == "dev") {
+                        sh "docker tag build-image $DEV_REPO:latest"
+                        sh "docker push $DEV_REPO:latest"
+                    }
+
+                    if (env.BRANCH_NAME == "master") {
+                        sh "docker tag build-image $PROD_REPO:latest"
+                        sh "docker push $PROD_REPO:latest"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Locally') {
+            when { branch 'master' }
+            steps {
+                sh """
+                    docker pull $PROD_REPO:latest
+                    docker stop react-app || true
+                    docker rm react-app || true
+                    docker run -d -p 80:80 --name react-app $PROD_REPO:latest
+                """
+            }
+        }
+    }
+}
