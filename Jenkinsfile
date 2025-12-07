@@ -9,7 +9,7 @@ pipeline {
         PROD_REPO = "dhinesh5799/react-app-prod"                    // Prod repository (private)
 
         // 🔹 App Server (EC2)
-        APP_SERVER = "ubuntu@3.110.138.62"                          // Application EC2 IP
+        APP_SERVER = "ubuntu@3.110.138.62"                          // Application EC2 IP (change if needed)
     }
 
     stages {
@@ -17,15 +17,16 @@ pipeline {
         // Stage 1: Checkout the code from GitHub
         stage('Checkout') {
             steps {
+                echo "📥 Checking out source code from GitHub..."
                 checkout scm
             }
         }
 
-        // Stage 2: Build the Docker image
+        // Stage 2: Build the Docker image (from /build directory)
         stage('Build Docker Image') {
             steps {
-                echo "🛠️ Building Docker image..."
-                sh 'docker build -t build-image .'
+                echo "🛠️ Building Docker image from ./build directory..."
+                sh 'docker build -t build-image -f ./build/Dockerfile ./build'
             }
         }
 
@@ -55,7 +56,7 @@ pipeline {
         stage('Test SSH Connection') {
             steps {
                 echo "🔗 Testing SSH connection to App Server..."
-                sshagent(['app-server']) {
+                sshagent(['app-server']) {   // Jenkins credential ID for SSH key
                     sh "ssh -o StrictHostKeyChecking=no $APP_SERVER 'hostname && whoami'"
                 }
             }
@@ -79,6 +80,15 @@ pipeline {
                         '
                     """
                 }
+            }
+        }
+
+        // Stage 6: Health Check (only for master branch)
+        stage('Health Check') {
+            when { branch 'master' }
+            steps {
+                echo "🔍 Performing health check on deployed app..."
+                sh "sleep 5 && curl -s -o /dev/null -w '%{http_code}' http://3.110.138.62 | grep 200"
             }
         }
     }
