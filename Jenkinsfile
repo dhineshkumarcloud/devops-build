@@ -3,18 +3,17 @@ pipeline {
 
     environment {
         // 🔹 Docker Hub Configuration
-        DOCKER_USER = "dhinesh5799"                                 // Docker Hub username
-        DOCKER_CREDS = credentials('fdfdb2bd-8384-4bd7-bc62-bd7663e85283') // Docker Hub credentials ID
-        DEV_REPO = "dhinesh5799/react-app-dev"                      // Dev repository (public)
-        PROD_REPO = "dhinesh5799/react-app-prod"                    // Prod repository (private)
+        DOCKER_USER = "dhinesh5799"
+        DOCKER_CREDS = credentials('fdfdb2bd-8384-4bd7-bc62-bd7663e85283')  // Jenkins DockerHub credential ID
+        DEV_REPO = "dhinesh5799/react-app-dev"
+        PROD_REPO = "dhinesh5799/react-app-prod"
 
         // 🔹 App Server (EC2)
-        APP_SERVER = "ubuntu@3.110.138.62"                          // Application EC2 IP (change if needed)
+        APP_SERVER = "ubuntu@3.110.138.62"   // Change to your App EC2 IP
     }
 
     stages {
 
-        // Stage 1: Checkout the code from GitHub
         stage('Checkout') {
             steps {
                 echo "📥 Checking out source code from GitHub..."
@@ -22,7 +21,6 @@ pipeline {
             }
         }
 
-        // Stage 2: Build the Docker image (from /build directory)
         stage('Build Docker Image') {
             steps {
                 echo "🛠️ Building Docker image from ./build directory..."
@@ -30,7 +28,6 @@ pipeline {
             }
         }
 
-        // Stage 3: Push image to Docker Hub (based on branch)
         stage('Push to Docker Hub') {
             steps {
                 script {
@@ -52,50 +49,30 @@ pipeline {
             }
         }
 
-        // Stage 4: Test SSH Connection to Application Server
-        stage('Test SSH Connection') {
-            steps {
-                echo "🔗 Testing SSH connection to App Server..."
-                sshagent(['app-server']) {   // Jenkins credential ID for SSH key
-                    sh "ssh -o StrictHostKeyChecking=no $APP_SERVER 'hostname && whoami'"
-                }
-            }
-        }
-
-        // Stage 5: Deploy to Application EC2 (only for master branch)
         stage('Deploy to Application Server') {
             when { branch 'master' }
             steps {
-                echo "🚀 Deploying application to EC2 server..."
-                sshagent(['app-server']) {
+                echo "🚀 Deploying application to EC2..."
+                sshagent(['app-server']) {  // Jenkins SSH credential ID
                     sh """
                         ssh -o StrictHostKeyChecking=no $APP_SERVER '
                             echo "🧹 Cleaning up old containers..."
-                            docker pull $PROD_REPO:latest &&
                             docker stop react-app || true &&
                             docker rm react-app || true &&
-                            echo "🚀 Running new container..."
+                            docker pull $PROD_REPO:latest &&
+                            echo "🚀 Running new container..." &&
                             docker run -d -p 80:80 --name react-app $PROD_REPO:latest &&
-                            echo "✅ Deployment complete!"
+                            echo "✅ Deployment successful!"
                         '
                     """
                 }
-            }
-        }
-
-        // Stage 6: Health Check (only for master branch)
-        stage('Health Check') {
-            when { branch 'master' }
-            steps {
-                echo "🔍 Performing health check on deployed app..."
-                sh "sleep 5 && curl -s -o /dev/null -w '%{http_code}' http://3.110.138.62 | grep 200"
             }
         }
     }
 
     post {
         success {
-            echo "✅ Pipeline completed successfully!"
+            echo "✅ Pipeline completed successfully for branch: ${env.BRANCH_NAME}"
         }
         failure {
             echo "❌ Pipeline failed. Check logs for details."
