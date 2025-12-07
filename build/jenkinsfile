@@ -17,15 +17,16 @@ pipeline {
         // Stage 1: Checkout the code from GitHub
         stage('Checkout') {
             steps {
+                echo "📥 Checking out source code from GitHub..."
                 checkout scm
             }
         }
 
-        // Stage 2: Build the Docker image
+        // Stage 2: Build the Docker image (from /build directory)
         stage('Build Docker Image') {
             steps {
-                echo "🛠️ Building Docker image..."
-                sh 'docker build -t build-image .'
+                echo "🛠️ Building Docker image from /build directory..."
+                sh 'docker build -t build-image -f ./build/Dockerfile ./build'
             }
         }
 
@@ -79,6 +80,15 @@ pipeline {
                         '
                     """
                 }
+            }
+        }
+
+        // Stage 6: Health Check (optional - for master branch)
+        stage('Health Check') {
+            when { branch 'master' }
+            steps {
+                echo "🔍 Performing health check on deployed app..."
+                sh "curl -s -o /dev/null -w '%{http_code}' http://3.110.138.62 | grep 200"
             }
         }
     }
