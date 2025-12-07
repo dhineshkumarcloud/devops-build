@@ -2,28 +2,25 @@ pipeline {
     agent any
 
     environment {
-        // 🔹 Docker Hub Configuration
         DOCKER_USER = "dhinesh5799"
-        DOCKER_CREDS = credentials('fdfdb2bd-8384-4bd7-bc62-bd7663e85283')  // Jenkins DockerHub credential ID
+        DOCKER_CREDS = credentials('fdfdb2bd-8384-4bd7-bc62-bd7663e85283') // Jenkins DockerHub creds ID
         DEV_REPO = "dhinesh5799/react-app-dev"
         PROD_REPO = "dhinesh5799/react-app-prod"
-
-        // 🔹 App Server (EC2)
-        APP_SERVER = "ubuntu@3.110.138.62"   // Change to your App EC2 IP
+        APP_SERVER = "ubuntu@3.110.138.62"
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                echo "📥 Checking out source code from GitHub..."
+                echo "📥 Checking out source code..."
                 checkout scm
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo "🛠️ Building Docker image from ./build directory..."
+                echo "🛠️ Building Docker image..."
                 sh 'docker build -t build-image -f ./build/Dockerfile ./build'
             }
         }
@@ -52,16 +49,19 @@ pipeline {
         stage('Deploy to Application Server') {
             when { branch 'master' }
             steps {
-                echo "🚀 Deploying application to EC2..."
-                sshagent(['app-server']) {  // Jenkins SSH credential ID
+                echo "🚀 Deploying to EC2 server..."
+                sshagent(['app-server']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no $APP_SERVER '
+                            echo "🔑 Logging in to Docker Hub on EC2..."
+                            echo $DOCKER_CREDS_PSW | docker login -u $DOCKER_CREDS_USR --password-stdin
                             echo "🧹 Cleaning up old containers..."
-                            docker stop react-app || true &&
-                            docker rm react-app || true &&
-                            docker pull $PROD_REPO:latest &&
-                            echo "🚀 Running new container..." &&
-                            docker run -d -p 80:80 --name react-app $PROD_REPO:latest &&
+                            docker stop react-app || true
+                            docker rm react-app || true
+                            echo "📦 Pulling latest image..."
+                            docker pull $PROD_REPO:latest
+                            echo "🚀 Starting new container..."
+                            docker run -d -p 80:80 --name react-app $PROD_REPO:latest
                             echo "✅ Deployment successful!"
                         '
                     """
